@@ -12,14 +12,27 @@ export default async function handler(req, res) {
 
     // 没收到授权码
     if (!code) {
-      return res.status(400).json({
-        success: false,
-        message: "No authorization code received."
-      });
-    }
+     return res.status(400).json({
+  success: false,
+  message: "Failed to obtain TikTok access token.",
+  tiktok_code: result.code ?? null,
+  tiktok_message: result.message ?? "Unknown error",
 
-    const appKey = process.env.TIKTOK_APP_KEY;
-    const appSecret = process.env.TIKTOK_APP_SECRET;
+  diagnostic: {
+    app_key_configured: Boolean(appKey),
+    app_secret_configured: Boolean(appSecret),
+
+    env_app_key_length: appKey?.length ?? 0,
+    callback_app_key_length: callbackAppKey?.length ?? 0,
+
+    app_key_matches_callback:
+      Boolean(appKey && callbackAppKey && appKey === callbackAppKey)
+  }
+});
+
+ const appKey = process.env.TIKTOK_APP_KEY?.trim();
+const appSecret = process.env.TIKTOK_APP_SECRET?.trim();
+const callbackAppKey = req.query.app_key?.trim();
 
     if (!appKey || !appSecret) {
       return res.status(500).json({
