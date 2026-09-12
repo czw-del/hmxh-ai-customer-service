@@ -27,23 +27,25 @@ export default async function handler(req, res) {
       });
     }
 
-    const path = "/authorization/202309/shops";
-    const timestamp = Math.floor(Date.now() / 1000);
+   const path = "/authorization/202309/shops";
+const timestamp = Math.floor(Date.now() / 1000);
 
-    const paramsToSign = {
-      app_key: appKey,
-      timestamp: String(timestamp)
-    };
+const paramsToSign = {
+  app_key: appKey,
+  timestamp: String(timestamp)
+};
 
-    const sortedKeys = Object.keys(paramsToSign).sort();
+const sortedKeys = Object.keys(paramsToSign).sort();
 
-    const parameterString = sortedKeys
-      .map((key) => `${key}${paramsToSign[key]}`)
-      .join("");
+const parameterString = sortedKeys
+  .map((key) => `${key}${paramsToSign[key]}`)
+  .join("");
 
- const signString =
+const signString =
+  appSecret +
   path +
-  parameterString;
+  parameterString +
+  appSecret;
 
 const sign = crypto
   .createHmac("sha256", appSecret)
