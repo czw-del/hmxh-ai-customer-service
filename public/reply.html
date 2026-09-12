@@ -32,6 +32,9 @@
     <label for="conversationId">会话 ID</label>
     <input id="conversationId" inputmode="numeric" autocomplete="off" placeholder="例如：7684510555432976660" />
 
+    <label for="operatorNote">客服补充说明（可选）</label>
+    <textarea id="operatorNote" style="min-height:90px" maxlength="1000" placeholder="例如：平台故障导致自动取消；本次赠送优惠券。没有补充可留空。"></textarea>
+
     <label for="message">越南语回复草稿</label>
     <textarea id="message" maxlength="2000" placeholder="点击“生成草稿”后会显示在这里"></textarea>
 
@@ -44,6 +47,7 @@
 
   <script>
     const conversationId = document.querySelector("#conversationId");
+    const operatorNote = document.querySelector("#operatorNote");
     const message = document.querySelector("#message");
     const generateButton = document.querySelector("#generate");
     const sendButton = document.querySelector("#send");
@@ -70,7 +74,9 @@
       sendButton.disabled = true;
       setStatus("正在读取消息并生成草稿……");
       try {
-        const response = await fetch(`/api/tiktok/generate-reply?conversation_id=${encodeURIComponent(id)}`);
+        const params = new URLSearchParams({ conversation_id: id });
+        if (operatorNote.value.trim()) params.set("operator_note", operatorNote.value.trim());
+        const response = await fetch(`/api/tiktok/generate-reply?${params.toString()}`);
         const result = await response.json();
         if (!response.ok || !result.success) throw new Error(result.message || "生成失败");
         if (!result.needs_reply) {
