@@ -90,6 +90,7 @@ Write ONE short reply in natural Vietnamese to the buyer based only on the conve
 
 Rules:
 - Output only the reply; no labels, analysis, quotation marks, or markdown.
+- The reply must be one or two complete sentences and end with proper punctuation.
 - Be polite, warm, concise, and professional.
 - Do not invent order status, delivery dates, refunds, discounts, product facts, or shop policies.
 - Do not claim an action has been completed unless the conversation proves it.
@@ -112,7 +113,7 @@ ${transcript}`;
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 250,
+          maxOutputTokens: 1000,
         },
       }),
     },
