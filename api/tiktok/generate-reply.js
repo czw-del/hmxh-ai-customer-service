@@ -87,10 +87,12 @@ async function generateDraft(messages, operatorNote = "") {
 
   const prompt = `You are a careful customer-service assistant for a TikTok Shop seller.
 
-Write ONE short reply in natural Vietnamese to the buyer based only on the conversation below.
+Write one short reply in natural Vietnamese and provide its accurate Simplified Chinese translation.
 
 Rules:
-- Output only the reply; no labels, analysis, quotation marks, or markdown.
+- Output exactly two lines in this format, with no markdown or extra text:
+VI: <complete Vietnamese reply>
+ZH: <accurate Simplified Chinese translation>
 - The reply must be one or two complete sentences and end with proper punctuation.
 - Be polite, warm, concise, and professional.
 - Do not invent order status, delivery dates, refunds, discounts, product facts, or shop policies.
@@ -160,12 +162,16 @@ ${transcript}`;
   }
 
   const body = generated.body;
-  const draft = body?.candidates?.[0]?.content?.parts
+  const output = body?.candidates?.[0]?.content?.parts
     ?.map((part) => part?.text || "")
     .join("")
     .trim();
-  if (!draft) throw new Error("Gemini returned an empty draft");
-  return { draft, model: generated.model };
+  if (!output) throw new Error("Gemini returned an empty draft");
+  const viMatch = output.match(/(?:^|\n)VI:\s*([\s\S]*?)(?=\nZH:|$)/i);
+  const zhMatch = output.match(/(?:^|\n)ZH:\s*([\s\S]*?)$/i);
+  const draft = (viMatch?.[1] || output).trim();
+  const translationZh = (zhMatch?.[1] || "").trim();
+  return { draft, translationZh, model: generated.model };
 }
 
 export default async function handler(req, res) {
@@ -219,6 +225,7 @@ export default async function handler(req, res) {
       conversation_id: conversationId,
       needs_reply: true,
       draft: generated.draft,
+      translation_zh: generated.translationZh,
       model_used: generated.model,
       auto_sent: false,
     });
