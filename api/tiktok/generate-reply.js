@@ -18,7 +18,7 @@ function sign(path, query, secret) {
     .join("");
   return crypto
     .createHmac("sha256", secret)
-    .update(`${secret}${path}${params}${secret}`)
+    .update(`${secret}${path}${params}${secret}`)a
     .digest("hex");
 }
 
@@ -73,6 +73,11 @@ async function getMessages(conversationId) {
 
 async function generateDraft(messages, operatorNote = "") {
   const apiKey = env("GEMINI_API_KEY");
+  const latestBuyerMessage = [...messages]
+    .filter((message) => message?.sender?.role === "BUYER")
+    .sort((a, b) => Number(a?.create_time || 0) - Number(b?.create_time || 0))
+    .at(-1);
+  const latestBuyerText = messageText(latestBuyerMessage);
   const transcript = [...messages]
     .sort((a, b) => Number(a?.create_time || 0) - Number(b?.create_time || 0))
     .filter((message) =>
@@ -90,7 +95,8 @@ async function generateDraft(messages, operatorNote = "") {
 Write one short reply in natural Vietnamese and provide its accurate Simplified Chinese translation.
 
 Rules:
-- Output exactly two lines in this format, with no markdown or extra text:
+- Output exactly three lines in this format, with no markdown or extra text:
+CUSTOMER_ZH: <accurate Simplified Chinese translation of the latest buyer message>
 VI: <complete Vietnamese reply>
 ZH: <accurate Simplified Chinese translation>
 - The reply must be one or two complete sentences and end with proper punctuation.
@@ -118,7 +124,10 @@ Trusted operator note (facts supplied by the shop; may be empty):
 ${operatorNote || "No additional facts supplied."}
 
 Conversation:
-${transcript}`;
+${transcript}
+
+Latest buyer message to translate:
+${latestBuyerText}`;
 
   async function callGemini(model, timeoutMs) {
     const controller = new AbortController();
@@ -169,9 +178,17 @@ ${transcript}`;
   if (!output) throw new Error("Gemini returned an empty draft");
   const viMatch = output.match(/(?:^|\n)VI:\s*([\s\S]*?)(?=\nZH:|$)/i);
   const zhMatch = output.match(/(?:^|\n)ZH:\s*([\s\S]*?)$/i);
+  const customerZhMatch = output.match(/(?:^|\n)CUSTOMER_ZH:\s*([\s\S]*?)(?=\nVI:|$)/i);
   const draft = (viMatch?.[1] || output).trim();
   const translationZh = (zhMatch?.[1] || "").trim();
-  return { draft, translationZh, model: generated.model };
+  const customerTranslationZh = (customerZhMatch?.[1] || "").trim();
+  return {
+    draft,
+    translationZh,
+    customerMessage: latestBuyerText,
+    customerTranslationZh,
+    model: generated.model,
+  };
 }
 
 export default async function handler(req, res) {
@@ -226,6 +243,8 @@ export default async function handler(req, res) {
       needs_reply: true,
       draft: generated.draft,
       translation_zh: generated.translationZh,
+      customer_message: generated.customerMessage,
+      customer_translation_zh: generated.customerTranslationZh,
       model_used: generated.model,
       auto_sent: false,
     });
