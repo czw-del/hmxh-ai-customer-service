@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
 
 const TIKTOK_ORIGIN = "https://open-api.tiktokglobalshop.com";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+const PRIMARY_GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+const FALLBACK_GEMINI_MODEL = "gemini-3.5-flash-lite";
 
 function env(name) {
   const value = (process.env[name] || "").trim();
@@ -117,33 +118,54 @@ ${operatorNote || "No additional facts supplied."}
 Conversation:
 ${transcript}`;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 1000,
+  async function callGemini(model, timeoutMs) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+        {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey,
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 800,
+              thinkingConfig: { thinkingLevel: "low" },
+            },
+          }),
         },
-      }),
-    },
-  );
-  const body = await response.json();
-  if (!response.ok) {
-    throw new Error(body?.error?.message || "Gemini request failed");
+      );
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body?.error?.message || `${model} request failed`);
+      }
+      return { body, model };
+    } finally {
+      clearTimeout(timer);
+    }
   }
+
+  let generated;
+  try {
+    generated = await callGemini(PRIMARY_GEMINI_MODEL, 5000);
+  } catch (primaryError) {
+    if (PRIMARY_GEMINI_MODEL === FALLBACK_GEMINI_MODEL) throw primaryError;
+    generated = await callGemini(FALLBACK_GEMINI_MODEL, 7000);
+  }
+
+  const body = generated.body;
   const draft = body?.candidates?.[0]?.content?.parts
     ?.map((part) => part?.text || "")
     .join("")
     .trim();
   if (!draft) throw new Error("Gemini returned an empty draft");
-  return draft;
+  return { draft, model: generated.model };
 }
 
 export default async function handler(req, res) {
@@ -190,13 +212,14 @@ export default async function handler(req, res) {
     const operatorNote = String(
       req.body?.operator_note || req.query?.operator_note || "",
     ).trim().slice(0, 1000);
-    const draft = await generateDraft(messages, operatorNote);
+    const generated = await generateDraft(messages, operatorNote);
     return res.status(200).json({
       success: true,
       mode: "draft_only",
       conversation_id: conversationId,
       needs_reply: true,
-      draft,
+      draft: generated.draft,
+      model_used: generated.model,
       auto_sent: false,
     });
   } catch (error) {
