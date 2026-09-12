@@ -61,19 +61,24 @@ export default async function handler(req, res) {
     const path = "/customer_service/202309/conversations";
     const timestamp = Math.floor(Date.now() / 1000);
 
-    const params = {
-      app_key: appKey,
-      locale: "vi-VN",
-      page_size: "10",
-      shop_cipher: shopCipher,
-      timestamp: String(timestamp)
-    };
+   const signParams = {
+  app_key: appKey,
+  timestamp: String(timestamp)
+};
 
-    const sign = generateTikTokSign(
-      path,
-      params,
-      appSecret
-    );
+const sign = generateTikTokSign(
+  path,
+  signParams,
+  appSecret
+);
+
+const params = {
+  app_key: appKey,
+  locale: "vi-VN",
+  page_size: "10",
+  shop_cipher: shopCipher,
+  timestamp: String(timestamp)
+};
 
     const query = new URLSearchParams({
       ...params,
