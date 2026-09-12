@@ -42,6 +42,7 @@ function addOptional(query, key, value) {
 }
 
 export default async function handler(req, res) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
     return res.status(405).json({ success: false, message: "Method not allowed" });
@@ -72,7 +73,7 @@ export default async function handler(req, res) {
       page_size: String(
         boundedInteger(
           one(req.query.page_size),
-          10,
+          isMessagesRequest ? 10 : 20,
           1,
           isMessagesRequest ? 10 : 20,
         ),
