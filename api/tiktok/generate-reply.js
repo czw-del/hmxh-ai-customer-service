@@ -43,7 +43,7 @@ async function getMessages(conversationId) {
     timestamp: String(Math.floor(Date.now() / 1000)),
     page_size: "10",
     locale: "vi-VN",
-    sort_order: "ASC",
+    sort_order: "DESC",
     sort_field: "create_time",
     shop_cipher: shopCipher,
   };
@@ -72,7 +72,11 @@ async function getMessages(conversationId) {
 
 async function generateDraft(messages) {
   const apiKey = env("GEMINI_API_KEY");
-  const transcript = messages
+  const transcript = [...messages]
+    .sort((a, b) => Number(a?.create_time || 0) - Number(b?.create_time || 0))
+    .filter((message) =>
+      ["BUYER", "SHOP", "CUSTOMER_SERVICE"].includes(message?.sender?.role),
+    )
     .map((message) => {
       const role = message?.sender?.role || "UNKNOWN";
       return `[${role}] ${messageText(message)}`;
@@ -146,11 +150,32 @@ export default async function handler(req, res) {
     if (!messages.length) {
       return res.status(404).json({ success: false, message: "No messages found" });
     }
+
+    const humanMessages = [...messages]
+      .filter((message) =>
+        ["BUYER", "SHOP", "CUSTOMER_SERVICE"].includes(message?.sender?.role),
+      )
+      .sort((a, b) => Number(a?.create_time || 0) - Number(b?.create_time || 0));
+
+    const latestHumanMessage = humanMessages.at(-1);
+    if (!latestHumanMessage || latestHumanMessage?.sender?.role !== "BUYER") {
+      return res.status(200).json({
+        success: true,
+        mode: "draft_only",
+        conversation_id: conversationId,
+        needs_reply: false,
+        reason: "The latest real message is not from the buyer",
+        draft: null,
+        auto_sent: false,
+      });
+    }
+
     const draft = await generateDraft(messages);
     return res.status(200).json({
       success: true,
       mode: "draft_only",
       conversation_id: conversationId,
+      needs_reply: true,
       draft,
       auto_sent: false,
     });
