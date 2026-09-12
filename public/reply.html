@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TikTok 客服回复</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f5f6f8; color: #1f2329; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { width: min(720px, calc(100% - 32px)); margin: 48px auto; background: white; padding: 28px; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,.07); }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    .hint { color: #667085; margin: 0 0 24px; }
+    label { display: block; font-weight: 650; margin: 18px 0 8px; }
+    input, textarea { width: 100%; border: 1px solid #d0d5dd; border-radius: 10px; padding: 12px; font: inherit; }
+    textarea { min-height: 180px; resize: vertical; line-height: 1.6; }
+    input:focus, textarea:focus { outline: 2px solid #b9e6fe; border-color: #0ba5ec; }
+    .actions { display: flex; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
+    button { border: 0; border-radius: 10px; padding: 11px 18px; font: inherit; font-weight: 650; cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+    #generate { background: #eef2f6; color: #1f2329; }
+    #send { background: #111827; color: white; }
+    #status { min-height: 24px; margin: 18px 0 0; padding: 12px; border-radius: 10px; background: #f8fafc; color: #475467; }
+    #status.success { background: #ecfdf3; color: #027a48; }
+    #status.error { background: #fef3f2; color: #b42318; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>TikTok 客服回复</h1>
+    <p class="hint">先生成 AI 草稿，检查并修改后，再人工确认发送。</p>
+
+    <label for="conversationId">会话 ID</label>
+    <input id="conversationId" inputmode="numeric" autocomplete="off" placeholder="例如：7684510555432976660" />
+
+    <label for="message">越南语回复草稿</label>
+    <textarea id="message" maxlength="2000" placeholder="点击“生成草稿”后会显示在这里"></textarea>
+
+    <div class="actions">
+      <button id="generate" type="button">生成草稿</button>
+      <button id="send" type="button">确认并发送</button>
+    </div>
+    <p id="status">尚未执行操作。</p>
+  </main>
+
+  <script>
+    const conversationId = document.querySelector("#conversationId");
+    const message = document.querySelector("#message");
+    const generateButton = document.querySelector("#generate");
+    const sendButton = document.querySelector("#send");
+    const status = document.querySelector("#status");
+
+    function setStatus(text, type = "") {
+      status.textContent = text;
+      status.className = type;
+    }
+
+    function validId() {
+      const id = conversationId.value.trim();
+      if (!/^\d+$/.test(id)) {
+        setStatus("请输入正确的数字会话 ID。", "error");
+        return null;
+      }
+      return id;
+    }
+
+    async function generateDraft() {
+      const id = validId();
+      if (!id) return;
+      generateButton.disabled = true;
+      sendButton.disabled = true;
+      setStatus("正在读取消息并生成草稿……");
+      try {
+        const response = await fetch(`/api/tiktok/generate-reply?conversation_id=${encodeURIComponent(id)}`);
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || "生成失败");
+        if (!result.needs_reply) {
+          message.value = "";
+          setStatus("这条会话目前不需要回复。", "success");
+          return;
+        }
+        message.value = result.draft || "";
+        setStatus("草稿已生成。请检查或修改后再发送。", "success");
+      } catch (error) {
+        setStatus(error.message || "生成草稿失败。", "error");
+      } finally {
+        generateButton.disabled = false;
+        sendButton.disabled = false;
+      }
+    }
+
+    async function sendReply() {
+      const id = validId();
+      if (!id) return;
+      const text = message.value.trim();
+      if (!text) {
+        setStatus("请先生成或填写回复内容。", "error");
+        return;
+      }
+      if (!window.confirm(`确定发送这条回复吗？\n\n${text}`)) return;
+
+      generateButton.disabled = true;
+      sendButton.disabled = true;
+      setStatus("正在发送……");
+      try {
+        const response = await fetch("/api/tiktok/send-reply", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversation_id: id, message: text, confirm: true }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || "发送失败");
+        setStatus("回复已成功发送给买家。", "success");
+      } catch (error) {
+        setStatus(error.message || "发送失败。", "error");
+      } finally {
+        generateButton.disabled = false;
+        sendButton.disabled = false;
+      }
+    }
+
+    generateButton.addEventListener("click", generateDraft);
+    sendButton.addEventListener("click", sendReply);
+  </script>
+</body>
+</html>
