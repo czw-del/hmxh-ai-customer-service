@@ -135,50 +135,75 @@ ${JSON.stringify(context, null, 2)}
 }
 `;
 
-    const model = "gemini-3.6-flash";
+       const models = [
+      "gemini-3.8-flash",
+      "gemini-3.7-flash",
+      "gemini-3.6-flash",
+      "gemini-3.5-flash-lite"
+    ];
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [
+    let finalData = null;
+    let usedModel = null;
+    let lastError = null;
+
+    for (const model of models) {
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey
+            },
+            body: JSON.stringify({
+              contents: [
                 {
-                  text: prompt
+                  role: "user",
+                  parts: [
+                    {
+                      text: prompt
+                    }
+                  ]
                 }
-              ]
-            }
-          ],
+              ],
 
-          generationConfig: {
-            temperature: 0.35,
-            responseMimeType: "application/json"
+              generationConfig: {
+                responseMimeType: "application/json"
+              }
+            })
           }
-        })
-      }
-    );
+        );
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (!response.ok) {
-      return res.status(500).json({
-        success: false,
-        message: "Gemini request failed.",
-        detail:
+        if (response.ok) {
+          finalData = data;
+          usedModel = model;
+          break;
+        }
+
+        lastError =
           data?.error?.message ||
-          "Unknown Gemini API error"
+          `Gemini request failed with status ${response.status}`;
+
+      } catch (error) {
+        lastError =
+          error?.message ||
+          "Gemini request failed.";
+      }
+    }
+
+    if (!finalData) {
+      return res.status(503).json({
+        success: false,
+        message: "All Gemini models are temporarily unavailable.",
+        detail: lastError
       });
     }
 
     const text =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      finalData?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!text) {
       return res.status(500).json({
@@ -194,14 +219,15 @@ ${JSON.stringify(context, null, 2)}
     } catch (error) {
       return res.status(500).json({
         success: false,
-        message: "Gemini returned invalid JSON."
+        message: "Gemini returned invalid JSON.",
+        raw: text
       });
     }
 
     return res.status(200).json({
       success: true,
       provider: "gemini",
-      model,
+      model: usedModel,
       analysis
     });
 
