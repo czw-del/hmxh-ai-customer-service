@@ -5,55 +5,104 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>TikTok AI 客服工作台</title>
   <style>
-    *{box-sizing:border-box} body{margin:0;background:#f4f6f8;color:#17202a;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
-    main{width:min(1180px,calc(100% - 28px));margin:28px auto} h1{margin:0;font-size:26px}.sub{margin:6px 0 22px;color:#667085}
-    .layout{display:grid;grid-template-columns:380px 1fr;gap:18px}.panel{background:#fff;border-radius:16px;padding:20px;box-shadow:0 7px 25px rgba(16,24,40,.06)}
-    .panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.panel-head h2{font-size:18px;margin:0}
-    button{border:0;border-radius:9px;padding:10px 15px;font:inherit;font-weight:650;cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}
-    .secondary{background:#eef2f6;color:#17202a}.primary{background:#111827;color:#fff}.danger{background:#b42318;color:#fff}
-    #list{display:grid;gap:10px;max-height:680px;overflow:auto}.empty{padding:26px 12px;text-align:center;color:#667085;background:#f8fafc;border-radius:10px}
-    .chat{width:100%;text-align:left;background:#f8fafc;border:1px solid #e4e7ec;padding:13px}.chat:hover{border-color:#84caff;background:#f5fbff}.chat.active{border-color:#0ba5ec;background:#effbff}
-    .chat-top{display:flex;justify-content:space-between;gap:10px}.name{font-weight:700}.badge{background:#d92d20;color:#fff;border-radius:999px;min-width:24px;padding:2px 8px;text-align:center;font-size:12px}.preview{display:block;margin-top:6px;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    label{display:block;font-weight:650;margin:16px 0 7px}input,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;padding:11px;font:inherit}textarea{min-height:115px;resize:vertical;line-height:1.55}#message{min-height:190px}
-    input:focus,textarea:focus{outline:2px solid #b9e6fe;border-color:#0ba5ec}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-    #status{min-height:24px;margin:16px 0 0;padding:11px;border-radius:9px;background:#f8fafc;color:#475467}.success{background:#ecfdf3!important;color:#027a48!important}.error{background:#fef3f2!important;color:#b42318!important}
-    @media(max-width:820px){.layout{grid-template-columns:1fr}#list{max-height:360px}}
+    *{box-sizing:border-box}body{margin:0;background:#f3f5f7;color:#17202a;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}button,input,textarea{font:inherit}
+    header{height:64px;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;padding:0 24px;gap:14px}header h1{font-size:21px;margin:0}header span{color:#667085;font-size:14px}
+    .app{height:calc(100vh - 64px);display:grid;grid-template-columns:320px minmax(420px,1fr) 360px;gap:1px;background:#dfe3e8}.column{background:#fff;min-width:0;overflow:hidden}
+    .head{height:62px;padding:0 18px;border-bottom:1px solid #eaecf0;display:flex;align-items:center;justify-content:space-between}.head h2{font-size:17px;margin:0}.small{font-size:13px;color:#667085}
+    button{border:0;border-radius:9px;padding:9px 14px;font-weight:650;cursor:pointer}.secondary{background:#eef2f6;color:#17202a}.primary{background:#111827;color:#fff}button:disabled{opacity:.5;cursor:not-allowed}
+    #list{height:calc(100% - 62px);overflow:auto;padding:10px}.chat{width:100%;min-width:0;overflow:hidden;text-align:left;border:1px solid transparent;border-radius:11px;padding:12px;margin-bottom:8px;background:#f8fafc}.chat:hover,.chat.active{border-color:#38bdf8}.chat.unread{background:#fff1f0;border-left:5px solid #e5484d}.chat.pending{background:#fff8db;border-left:5px solid #f5a524}.chat.replied{background:#f5f6f7;border-left:5px solid #98a2b3}
+    .chat-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.name{font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.badge{flex:none;border-radius:999px;padding:2px 8px;font-size:12px}.unread .badge{background:#e5484d;color:#fff}.pending .badge{background:#f5a524;color:#3d2800}.replied .badge{background:#98a2b3;color:#fff}.preview{display:block;margin-top:6px;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .conversation{display:grid;grid-template-rows:62px 1fr auto;height:100%}#messages{overflow:auto;padding:22px;background:#f7f8fa}.bubble-row{display:flex;margin:10px 0}.bubble-row.out{justify-content:flex-end}.bubble{max-width:75%;padding:11px 13px;border-radius:12px;background:#fff;border:1px solid #e4e7ec;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}.out .bubble{background:#dff7f3;border-color:#b8e9df}.role{display:block;font-size:11px;color:#98a2b3;margin-bottom:4px}.empty{padding:32px;text-align:center;color:#667085}
+    #customerTranslation{display:none;margin:0 18px 14px;padding:12px 14px;background:#eef8ff;border:1px solid #b9e6fe;border-radius:10px;color:#175cd3}.composer{padding:14px 18px 18px;border-top:1px solid #eaecf0;background:#fff}.composer textarea{width:100%;min-height:88px;resize:vertical;border:1px solid #d0d5dd;border-radius:10px;padding:11px;line-height:1.5}.composer textarea:focus,input:focus{outline:2px solid #bae6fd;border-color:#38bdf8}.compose-actions{display:flex;gap:9px;margin-top:9px}
+    .side{height:100%;overflow:auto;padding-bottom:20px}.profile{padding:20px;text-align:center;border-bottom:1px solid #eaecf0}.avatar{width:58px;height:58px;border-radius:50%;background:#111827;color:#fff;display:grid;place-items:center;margin:0 auto 10px;font-size:22px;font-weight:700}.profile h3{margin:0 0 5px}.profile p{margin:0;color:#667085;font-size:13px}.form{padding:4px 18px 18px}.form label{display:block;font-weight:700;font-size:14px;margin:15px 0 7px}.form input,.form textarea{width:100%;border:1px solid #d0d5dd;border-radius:9px;padding:10px}.form textarea{min-height:90px;resize:vertical;line-height:1.5}.readonly{background:#f8fafc}.send-actions{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap}#status{margin-top:13px;padding:10px;border-radius:9px;background:#f8fafc;color:#475467;font-size:13px}.success{background:#ecfdf3!important;color:#027a48!important}.error{background:#fef3f2!important;color:#b42318!important}
+    @media(max-width:1000px){.app{grid-template-columns:290px 1fr}.side{display:none}}@media(max-width:680px){header span{display:none}.app{display:block;height:auto}.column{min-height:420px}.conversation{height:720px}#list{height:360px}}
   </style>
 </head>
 <body>
-<main>
-  <h1>TikTok AI 客服工作台</h1>
-  <p class="sub">选择最近会话，生成 AI 草稿，检查修改后再人工发送。</p>
-  <div class="layout">
-    <section class="panel">
-      <div class="panel-head"><h2>最近会话</h2><button id="refresh" class="secondary">刷新</button></div>
-      <div id="list"><div class="empty">正在读取未读消息……</div></div>
+  <header><h1>TikTok AI 客服工作台</h1><span>会话、中文翻译、AI 草稿与人工确认发送</span></header>
+  <main class="app">
+    <section class="column">
+      <div class="head"><div><h2>客户会话</h2><span class="small">红=未读　黄=已读未回　灰=已回复</span></div><button id="refresh" class="secondary">刷新</button></div>
+      <div id="list"><div class="empty">正在读取会话……</div></div>
     </section>
-    <section class="panel">
-      <div class="panel-head"><h2>回复编辑</h2></div>
-      <label for="conversationId">会话 ID</label>
-      <input id="conversationId" inputmode="numeric" autocomplete="off" placeholder="从左侧选择，或手动输入" />
-      <label for="operatorNote">客服补充说明（可选）</label>
-      <textarea id="operatorNote" maxlength="1000" placeholder="例如：平台故障导致自动取消；本次赠送优惠券。没有补充可留空。"></textarea>
-      <label for="message">越南语回复草稿</label>
-      <textarea id="message" maxlength="2000" placeholder="选择会话后点击“生成草稿”"></textarea>
-      <label for="translation">中文翻译（仅供查看，不会发送）</label>
-      <textarea id="translation" readonly placeholder="生成草稿后显示中文意思"></textarea>
-      <div class="actions"><button id="generate" class="secondary">生成草稿</button><button id="send" class="primary">确认并发送</button></div>
-      <p id="status">请选择左侧的待回复会话。</p>
+
+    <section class="column conversation">
+      <div class="head"><div><h2 id="chatTitle">请选择客户</h2><span id="chatMeta" class="small"></span></div></div>
+      <div id="messages"><div class="empty">从左侧选择一条会话查看聊天记录</div></div>
+      <div>
+        <div id="customerTranslation"></div>
+        <div class="composer">
+          <textarea id="message" maxlength="2000" placeholder="AI 生成的越南语回复会显示在这里，也可以人工修改"></textarea>
+          <div class="compose-actions"><button id="generate" class="secondary">生成 AI 回复</button><button id="send" class="primary">确认并发送</button></div>
+        </div>
+      </div>
     </section>
-  </div>
-</main>
-<script>
-const $=s=>document.querySelector(s),list=$("#list"),idInput=$("#conversationId"),note=$("#operatorNote"),message=$("#message"),translation=$("#translation"),status=$("#status"),refresh=$("#refresh"),generate=$("#generate"),send=$("#send");
-function setStatus(t,type=""){status.textContent=t;status.className=type}
-function contentText(raw){try{const x=JSON.parse(raw||"");return x.content||raw||""}catch{return raw||""}}
-function buyerName(c){return c.participants?.find(p=>p.role==="BUYER")?.nickname||"买家"}
-function validId(){const id=idInput.value.trim();if(!/^\d+$/.test(id)){setStatus("请选择会话或输入正确的数字会话 ID。","error");return null}return id}
-async function loadChats(){refresh.disabled=true;list.innerHTML='<div class="empty">正在读取最近会话……</div>';try{const r=await fetch(`/api/tiktok/conversations?_=${Date.now()}`,{cache:"no-store"});const j=await r.json();if(!r.ok||!j.success)throw new Error(j.message||"读取失败");const chats=(j.data?.conversations||[]).slice(0,20);if(!chats.length){list.innerHTML='<div class="empty">目前没有会话。</div>';return}list.innerHTML="";for(const c of chats){const unread=Number(c.unread_count||0),latestRole=c.latest_message?.sender?.role;const b=document.createElement("button");b.className="chat";b.type="button";b.dataset.id=c.id;b.innerHTML=`<span class="chat-top"><span class="name"></span><span class="badge"></span></span><span class="preview"></span>`;b.querySelector(".name").textContent=buyerName(c);const badge=b.querySelector(".badge");if(unread>0){badge.textContent=`未读 ${unread}`}else if(latestRole==="BUYER"){badge.textContent="已读未回复";badge.style.background="#fdb022";badge.style.color="#422006"}else{badge.textContent="已回复";badge.style.background="#98a2b3"}b.querySelector(".preview").textContent=contentText(c.latest_message?.content)||"暂无文字预览";b.onclick=()=>{document.querySelectorAll(".chat").forEach(x=>x.classList.remove("active"));b.classList.add("active");idInput.value=String(c.id);message.value="";translation.value="";setStatus(`已选择 ${buyerName(c)}，请点击“生成草稿”。`)};list.appendChild(b)}}catch(e){list.innerHTML=`<div class="empty">${e.message||"无法读取会话"}</div>`}finally{refresh.disabled=false}}
-async function generateDraft(){const id=validId();if(!id)return;generate.disabled=send.disabled=true;setStatus("正在读取消息并生成草稿……");try{const p=new URLSearchParams({conversation_id:id});if(note.value.trim())p.set("operator_note",note.value.trim());const r=await fetch(`/api/tiktok/generate-reply?${p}`,{cache:"no-store"});const j=await r.json();if(!r.ok||!j.success)throw new Error(j.message||"生成失败");if(!j.needs_reply){message.value="";translation.value="";setStatus("该会话目前不需要回复。","success");return}message.value=j.draft||"";translation.value=j.translation_zh||"";setStatus(`草稿和中文翻译已生成（${j.model||j.model_used||"AI"}）。请检查后再发送。`,"success")}catch(e){setStatus(e.message||"生成草稿失败。","error")}finally{generate.disabled=send.disabled=false}}
-async function sendReply(){const id=validId(),text=message.value.trim();if(!id)return;if(!text){setStatus("回复内容不能为空。","error");return}if(!confirm(`确认把以下内容发送给买家？\n\n${text}`))return;generate.disabled=send.disabled=true;setStatus("正在发送……");try{const r=await fetch("/api/tiktok/send-reply",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({conversation_id:id,message:text,confirm:true})});const j=await r.json();if(!r.ok||!j.success)throw new Error(j.message||"发送失败");setStatus("回复已成功发送给买家。","success");await loadChats()}catch(e){setStatus(e.message||"发送失败。","error")}finally{generate.disabled=send.disabled=false}}
-refresh.onclick=loadChats;generate.onclick=generateDraft;send.onclick=sendReply;loadChats();
-</script>
+
+    <aside class="column side">
+      <div class="profile"><div id="avatar" class="avatar">客</div><h3 id="buyerName">未选择客户</h3><p id="conversationLabel">会话 ID：—</p></div>
+      <div class="form">
+        <input id="conversationId" type="hidden" />
+        <label for="operatorNote">客服补充说明（可选）</label>
+        <textarea id="operatorNote" placeholder="例如：平台故障自动取消；本次赠送优惠券。没有补充可留空。"></textarea>
+        <label for="translation">AI 回复的中文翻译</label>
+        <textarea id="translation" class="readonly" readonly placeholder="生成回复后显示，仅供查看，不会发送"></textarea>
+        <div id="status">请选择左侧客户会话。</div>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    const $=(s)=>document.querySelector(s);
+    const list=$("#list"),messages=$("#messages"),refresh=$("#refresh"),generate=$("#generate"),send=$("#send");
+    const idInput=$("#conversationId"),note=$("#operatorNote"),message=$("#message"),translation=$("#translation"),customerTranslation=$("#customerTranslation"),status=$("#status");
+    let selected=null;
+
+    function setStatus(text,type=""){status.textContent=text;status.className=type}
+    function contentText(raw){try{const x=JSON.parse(raw||"");return String(x.content||raw||"")}catch{return String(raw||"")}}
+    function buyer(c){return c.participants?.find((p)=>p.role==="BUYER")||{nickname:"买家"}}
+    function statusInfo(c){const unread=Number(c.unread_count||0),role=c.latest_message?.sender?.role;if(unread>0)return{cls:"unread",text:`未读 ${unread}`};if(role==="BUYER")return{cls:"pending",text:"已读未回复"};return{cls:"replied",text:"已回复"}}
+
+    async function loadChats(){
+      refresh.disabled=true;list.innerHTML='<div class="empty">正在读取会话……</div>';
+      try{
+        const r=await fetch(`/api/tiktok/conversations?_=${Date.now()}`,{cache:"no-store"});
+        const j=await r.json();if(!r.ok||!j.success)throw new Error(j.message||"读取失败");
+        const chats=[...(j.data?.conversations||[])].sort((a,b)=>Number(b.latest_message?.create_time||0)-Number(a.latest_message?.create_time||0)).slice(0,20);
+        if(!chats.length){list.innerHTML='<div class="empty">目前没有会话</div>';return}
+        list.innerHTML="";
+        for(const c of chats){
+          const info=statusInfo(c),b=document.createElement("button");b.className=`chat ${info.cls}`;b.type="button";
+          const top=document.createElement("span");top.className="chat-top";const n=document.createElement("span");n.className="name";n.textContent=buyer(c).nickname||"买家";const badge=document.createElement("span");badge.className="badge";badge.textContent=info.text;top.append(n,badge);
+          const p=document.createElement("span");p.className="preview";p.textContent=contentText(c.latest_message?.content)||"非文字消息";b.append(top,p);b.onclick=()=>selectChat(c,b);list.appendChild(b);
+        }
+      }catch(e){list.innerHTML=`<div class="empty">${e.message||"无法读取会话"}</div>`}finally{refresh.disabled=false}
+    }
+
+    async function selectChat(c,button){
+      selected=c;document.querySelectorAll(".chat").forEach((x)=>x.classList.remove("active"));button.classList.add("active");
+      const who=buyer(c);idInput.value=c.id;message.value="";translation.value="";customerTranslation.style.display="none";
+      $("#chatTitle").textContent=who.nickname||"买家";$("#chatMeta").textContent=`会话 ID：${c.id}`;$("#buyerName").textContent=who.nickname||"买家";$("#conversationLabel").textContent=`会话 ID：${c.id}`;$("#avatar").textContent=(who.nickname||"客").slice(0,1).toUpperCase();setStatus("已选择客户，可生成 AI 回复。");
+      messages.innerHTML='<div class="empty">正在读取聊天记录……</div>';
+      try{
+        const r=await fetch(`/api/tiktok/conversations?conversation_id=${encodeURIComponent(c.id)}&_=${Date.now()}`,{cache:"no-store"});const j=await r.json();if(!r.ok||!j.success)throw new Error(j.message||"读取聊天失败");
+        const rows=[...(j.data?.messages||[])].sort((a,b)=>Number(a.create_time||0)-Number(b.create_time||0));messages.innerHTML="";
+        for(const m of rows){const row=document.createElement("div"),bubble=document.createElement("div"),role=document.createElement("span");const outgoing=m.sender?.role!=="BUYER";row.className=`bubble-row ${outgoing?"out":"in"}`;bubble.className="bubble";role.className="role";role.textContent=outgoing?"店铺":"买家";bubble.append(role,document.createTextNode(contentText(m.content)||`[${m.type||"消息"}]`));row.appendChild(bubble);messages.appendChild(row)}
+        messages.scrollTop=messages.scrollHeight;
+      }catch(e){messages.innerHTML=`<div class="empty">${e.message||"无法读取聊天"}</div>`}
+    }
+
+    async function generateDraft(){
+      const id=idInput.value;if(!/^\d+$/.test(id)){setStatus("请先选择客户。","error");return}generate.disabled=send.disabled=true;setStatus("正在翻译顾客消息并生成回复……");
+      try{const p=new URLSearchParams({conversation_id:id});if(note.value.trim())p.set("operator_note",note.value.trim());const r=await fetch(`/api/tiktok/generate-reply?${p}&_=${Date.now()}`,{cache:"no-store"});const j=await r.json();if(!r.ok||!j.success)throw new Error(j.message||"生成失败");if(!j.needs_reply){message.value="";translation.value="";setStatus("最新真实消息不是顾客发出的，目前无需回复。","success");return}message.value=j.draft||"";translation.value=j.translation_zh||"";customerTranslation.textContent=`顾客原话：${j.customer_message||""}\n中文：${j.customer_translation_zh||""}`;customerTranslation.style.whiteSpace="pre-wrap";customerTranslation.style.display="block";setStatus(`翻译和回复已生成（${j.model_used||"AI"}），请检查后发送。`,"success")}
+      catch(e){setStatus(e.message||"生成失败。","error")}finally{generate.disabled=send.disabled=false}
+    }
+
+    async function sendReply(){
+      const id=idInput.value,text=message.value.trim();if(!id||!text){setStatus("请先选择客户并生成回复。","error");return}if(!confirm(`确认发送给买家？\n\n${text}`))return;generate.disabled=send.disabled=true;setStatus("正在发送……");
+      try{const r=await fetch("/api/tiktok/send-reply",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({conversation_id:id,message:text,confirm:true})});const j=await r.json();if(!r.ok||!j.success)throw new Error(j.message||"发送失败");setStatus("回复已成功发送给买家。","success");await loadChats();if(selected){const active=[...document.querySelectorAll(".chat")].find((x)=>x.classList.contains("active"));if(active)await selectChat(selected,active)}}catch(e){setStatus(e.message||"发送失败。","error")}finally{generate.disabled=send.disabled=false}
+    }
+
+    refresh.onclick=loadChats;generate.onclick=generateDraft;send.onclick=sendReply;loadChats();
+  </script>
 </body>
 </html>
