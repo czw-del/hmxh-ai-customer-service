@@ -3,49 +3,51 @@ import crypto from "crypto";
 /**
  * TikTok Shop Open API 签名
  *
- * 规则：
- * 1. 排除 sign 和 access_token
- * 2. 其余实际发送的 Query 参数按参数名 ASCII 升序排列
- * 3. 拼接：path + key1 + value1 + key2 + value2 ...
- * 4. 前后加 appSecret
- * 5. 使用 appSecret 作为 HMAC-SHA256 key
+ * TikTok 官方规则：
+ * 1. 收集实际请求中的 Query 参数
+ * 2. 排除 sign
+ * 3. 排除 access_token
+ * 4. 参数名按 ASCII 升序
+ * 5. path + key/value 拼接
+ * 6. 前后加入 App Secret
+ * 7. 使用 App Secret 做 HMAC-SHA256
  */
 function generateTikTokSign(path, params, appSecret) {
-  const entries = Object.entries(params)
-    .filter(([key, value]) => {
-      return (
-        key !== "sign" &&
-        key !== "access_token" &&
-        value !== undefined &&
-        value !== null &&
-        value !== ""
-      );
-    })
-    .sort(([keyA], [keyB]) => {
-      if (keyA < keyB) return -1;
-      if (keyA > keyB) return 1;
-      return 0;
-    });
+  const filtered = {};
 
-  let signBase = path;
+  for (const [key, value] of Object.entries(params)) {
+    if (
+      key === "sign" ||
+      key === "access_token" ||
+      value === undefined ||
+      value === null
+    ) {
+      continue;
+    }
 
-  for (const [key, value] of entries) {
-    signBase += `${key}${String(value)}`;
+    filtered[key] = String(value);
   }
 
-  signBase =
+  const sortedKeys = Object.keys(filtered).sort();
+
+  let signString = path;
+
+  for (const key of sortedKeys) {
+    signString += key + filtered[key];
+  }
+
+  signString =
     appSecret +
-    signBase +
+    signString +
     appSecret;
 
   return crypto
     .createHmac("sha256", appSecret)
-    .update(signBase, "utf8")
+    .update(signString, "utf8")
     .digest("hex");
 }
 
 export default async function handler(req, res) {
-  // 只允许 GET
   if (req.method !== "GET") {
     return res.status(405).json({
       success: false,
@@ -54,9 +56,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ==============================
-    // 1. 读取 Vercel 环境变量
-    // ==============================
+    // ==========================================
+    // 1. Vercel 环境变量
+    // ==========================================
 
     const appKey =
       (process.env.TIKTOK_APP_KEY || "").trim();
@@ -70,31 +72,32 @@ export default async function handler(req, res) {
     const shopCipher =
       (process.env.TIKTOK_SHOP_CIPHER || "").trim();
 
-    // ==============================
-    // 2. 检查环境变量
-    // ==============================
+    const shopId =
+      (process.env.TIKTOK_SHOP_ID || "").trim();
 
     if (
       !appKey ||
       !appSecret ||
       !accessToken ||
-      !shopCipher
+      !shopCipher ||
+      !shopId
     ) {
       return res.status(500).json({
         success: false,
         message: "TikTok credentials are not configured.",
         diagnostic: {
-          app_key_configured: Boolean(appKey),
-          app_secret_configured: Boolean(appSecret),
-          access_token_configured: Boolean(accessToken),
-          shop_cipher_configured: Boolean(shopCipher)
+          app_key: Boolean(appKey),
+          app_secret: Boolean(appSecret),
+          access_token: Boolean(accessToken),
+          shop_cipher: Boolean(shopCipher),
+          shop_id: Boolean(shopId)
         }
       });
     }
 
-    // ==============================
-    // 3. TikTok API Path
-    // ==============================
+    // ==========================================
+    // 2. API Path
+    // ==========================================
 
     const path =
       "/customer_service/202309/conversations";
@@ -102,97 +105,118 @@ export default async function handler(req, res) {
     const timestamp =
       Math.floor(Date.now() / 1000);
 
-    // ==============================
-    // 4. 构造最终 Query 参数
+    // ==========================================
+    // 3. 严格复刻 TikTok API Testing Tool
     //
     // 注意：
-    // 这里放进去的参数，就是实际发送给 TikTok 的参数。
-    // 同时这些参数也会参与签名。
+    // 官方测试工具成功 cURL 中 locale 实际表现为：
+    // locale=+vi-VN
     //
-    // sign 本身除外。
-    // ==============================
+    // URL 中 + 表示空格，因此这里暂时保留前导空格。
+    // 目的是先让我们的 sign 与官方工具完全一致。
+    // ==========================================
 
-    const params = {
+    const queryParams = {
+      access_token: accessToken,
+
       app_key: appKey,
 
-      timestamp: String(timestamp),
-
-      shop_cipher: shopCipher,
+      locale: " vi-VN",
 
       page_size: "10",
 
-      locale: "vi-VN",
+      shop_cipher: shopCipher,
 
-      need_session_id: "false",
+      shop_id: shopId,
 
-      need_session_info: "false"
+      timestamp: String(timestamp),
+
+      version: "202309"
     };
 
-    // ==============================
-    // 5. 生成 TikTok sign
-    // ==============================
+    // ==========================================
+    // 4. 生成 sign
+    //
+    // generateTikTokSign 会自动排除：
+    // access_token
+    // sign
+    // ==========================================
 
     const sign = generateTikTokSign(
       path,
-      params,
+      queryParams,
       appSecret
     );
 
-    // ==============================
-    // 6. 拼接 URL
-    // ==============================
+    // ==========================================
+    // 5. 创建最终 URL
+    // ==========================================
 
-    const query = new URLSearchParams();
+    const searchParams =
+      new URLSearchParams();
 
-    // 为了确保“签名参数”和“实际请求参数”
-    // 完全来自同一个 params 对象
-    for (const [key, value] of Object.entries(params)) {
-      query.set(key, String(value));
+    for (
+      const [key, value]
+      of Object.entries(queryParams)
+    ) {
+      searchParams.set(
+        key,
+        String(value)
+      );
     }
 
-    query.set("sign", sign);
+    searchParams.set(
+      "sign",
+      sign
+    );
 
     const url =
-      `https://open-api.tiktokglobalshop.com${path}?${query.toString()}`;
+      `https://open-api.tiktokglobalshop.com${path}?${searchParams.toString()}`;
 
-    // ==============================
-    // 7. 请求 TikTok
-    // ==============================
+    // ==========================================
+    // 6. 请求 TikTok
+    // ==========================================
 
-    const response = await fetch(url, {
-      method: "GET",
+    const response = await fetch(
+      url,
+      {
+        method: "GET",
 
-      headers: {
-        "Content-Type": "application/json",
+        headers: {
+          "Content-Type":
+            "application/json",
 
-        // TikTok 202309+ 正式使用 Header 传 Token
-        "x-tts-access-token": accessToken
+          "x-tts-access-token":
+            accessToken
+        }
       }
-    });
+    );
 
-    // ==============================
-    // 8. 解析 TikTok 返回
-    // ==============================
-
-    const rawText = await response.text();
+    const raw =
+      await response.text();
 
     let data;
 
     try {
-      data = JSON.parse(rawText);
-    } catch (error) {
+      data = JSON.parse(raw);
+    } catch {
       return res.status(502).json({
         success: false,
-        message: "TikTok returned non-JSON response.",
-        http_status: response.status
+        message:
+          "TikTok returned a non-JSON response.",
+        http_status:
+          response.status
       });
     }
 
-    // ==============================
-    // 9. TikTok 返回错误
-    // ==============================
+    // ==========================================
+    // 7. TikTok API 错误
+    // ==========================================
 
-    if (!response.ok || data?.code !== 0) {
+    if (
+      !response.ok ||
+      data?.code !== 0
+    ) {
       return res.status(400).json({
         success: false,
 
@@ -203,13 +227,14 @@ export default async function handler(req, res) {
           data?.code ?? null,
 
         tiktok_message:
-          data?.message ?? "Unknown TikTok error",
+          data?.message ??
+          "Unknown TikTok error",
 
         request_id:
-          data?.request_id ?? null,
+          data?.request_id ??
+          null,
 
-        // 安全诊断信息
-        // 不泄露 App Secret / Token / shop_cipher
+        // 只返回安全诊断信息
         diagnostic: {
           path,
 
@@ -218,37 +243,49 @@ export default async function handler(req, res) {
           app_key_length:
             appKey.length,
 
-          app_key_suffix:
-            appKey.slice(-4),
-
           sign_length:
             sign.length,
+
+          locale_length:
+            queryParams.locale.length,
+
+          locale_has_leading_space:
+            queryParams.locale.startsWith(" "),
 
           signed_parameters: [
             "app_key",
             "locale",
-            "need_session_id",
-            "need_session_info",
             "page_size",
             "shop_cipher",
-            "timestamp"
+            "shop_id",
+            "timestamp",
+            "version"
+          ],
+
+          excluded_from_signature: [
+            "access_token",
+            "sign"
           ],
 
           access_token_configured:
             Boolean(accessToken),
 
           shop_cipher_configured:
-            Boolean(shopCipher)
+            Boolean(shopCipher),
+
+          shop_id_configured:
+            Boolean(shopId)
         }
       });
     }
 
-    // ==============================
-    // 10. 成功
-    // ==============================
+    // ==========================================
+    // 8. 成功
+    // ==========================================
 
     const conversations =
-      data?.data?.conversations || [];
+      data?.data?.conversations ||
+      [];
 
     return res.status(200).json({
       success: true,
@@ -262,10 +299,12 @@ export default async function handler(req, res) {
       conversations,
 
       next_page_token:
-        data?.data?.next_page_token || "",
+        data?.data?.next_page_token ||
+        "",
 
       request_id:
-        data?.request_id || null
+        data?.request_id ||
+        null
     });
 
   } catch (error) {
@@ -276,9 +315,13 @@ export default async function handler(req, res) {
 
     return res.status(500).json({
       success: false,
-      message: "Internal server error.",
+
+      message:
+        "Internal server error.",
+
       error:
-        error?.message || "Unknown error"
+        error?.message ||
+        "Unknown error"
     });
   }
 }
