@@ -41,16 +41,14 @@ export default async function handler(req, res) {
       .map((key) => `${key}${paramsToSign[key]}`)
       .join("");
 
-    const signString =
-      appSecret +
-      path +
-      parameterString +
-      appSecret;
+ const signString =
+  path +
+  parameterString;
 
-    const sign = crypto
-      .createHmac("sha256", appSecret)
-      .update(signString)
-      .digest("hex");
+const sign = crypto
+  .createHmac("sha256", appSecret)
+  .update(signString)
+  .digest("hex");
 
     const query = new URLSearchParams({
       app_key: appKey,
